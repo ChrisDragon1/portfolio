@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Video Library</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --background-color: #f0f0f0;
+            --card-color: #ffffff;
+            --text-color: #333333;
+            --border-color: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .nav-menu {
+            background-color: var(--primary-color);
+            padding: 15px 0;
+            margin-bottom: 30px;
+            border-radius: 8px;
+        }
+
+        .nav-item {
+            display: inline-block;
+            margin: 0 15px;
+        }
+
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s;
+        }
+
+        .nav-link:hover {
+            color: #f0f0f0;
+            text-decoration: underline;
+        }
+
+        .project-section {
+            background-color: var(--card-color);
+            margin-bottom: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .project-section:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .project-title {
+            color: var(--secondary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        .video-list {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .video-item {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .video-item:last-child {
+            border-bottom: none;
+        }
+
+        .video-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            display: block;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .video-link:hover {
+            color: #2980b9;
+            text-decoration: underline;
+        }
+
+        .video-date {
+            color: #7f8c8d;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+
+        .search-container {
+            margin-bottom: 20px;
+            display: flex;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px 0 0 4px;
+            font-size: 16px;
+        }
+
+        .search-button {
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .search-button:hover {
+            background-color: #2980b9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            text-align: center;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #fadbd8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-input" placeholder="Search projects or videos...">
+            <button id="searchButton" class="search-button">Search</button>
+        </div>
+
+        <div id="loading" class="loading">Loading project data...</div>
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        <div id="content"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.1.3/axios.min.js"></script>
+    <script>
+        // Configuration
+        const SPREADSHEET_ID = 'your_spreadsheet_id';
+        const SHEET_NAME = 'Sheet1';
+        const API_KEY = 'your_api_key';
+
+        // Google Sheets API URL
+        const SHEETS_API_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
+
+        // DOM Elements
+        const contentDiv = document.getElementById('content');
+        const loadingDiv = document.getElementById('loading');
+        const errorDiv = document.getElementById('errorMessage');
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+
+        // Fetch data from Google Sheets API
+        async function fetchData() {
+            try {
+                loadingDiv.style.display = 'block';
+                errorDiv.style.display = 'none';
+                contentDiv.innerHTML = '';
+
+                const response = await axios.get(SHEETS_API_URL);
+                const data = response.data.values;
+
+                if (!data || !data.length) {
+                    throw new Error('No data found in the spreadsheet.');
+                }
+
+                // Process header row
+                const headers = data[0];
+                const projectIndex = headers.indexOf('Project Name');
+                const linkIndex = headers.indexOf('Video Link');
+
+                if (projectIndex === -1 || linkIndex === -1) {
+                    throw new Error('Spreadsheet must contain "Project Name" and "Video Link" columns.');
+                }
+
+                // Process data rows
+                const projectData = {};
+                for (let i = 1; i < data.length; i++) {
+                    const row = data[i];
+                    const projectName = row[projectIndex];
+                    const videoLink = row[linkIndex];
+
+                    if (projectName && videoLink) {
+                        if (!projectData[projectName]) {
+                            projectData[projectName] = [];
+                        }
+
+                        // Get post date from X.com
+                        const postDate = await getPostDate(videoLink);
+                        if (postDate) {
+                            projectData[projectName].push({
+                                link: videoLink,
+                                date: postDate
+                            });
+                        }
+                    }
+                }
+
+                // Sort projects and videos
+                const sortedProjects = Object.keys(projectData).sort();
+                sortedProjects.forEach(projectName => {
+                    projectData[projectName].sort((a, b) => new Date(b.date) - new Date(a.date));
+                });
+
+                // Generate navigation menu
+                const navMenu = document.createElement('div');
+                navMenu.className = 'nav-menu';
+                navMenu.innerHTML = sortedProjects.map(projectName => `
+                    <div class="nav-item">
+                        <a href="#${projectName.toLowerCase().replace(/\s+/g, '-')}">${projectName}</a>
+                    </div>
+                `).join('');
+                contentDiv.appendChild(navMenu);
+
+                // Generate project sections
+                sortedProjects.forEach(projectName => {
+                    const projectSection = document.createElement('div');
+                    projectSection.id = projectName.toLowerCase().replace(/\s+/g, '-');
+                    projectSection.className = 'project-section';
+
+                    const videos = projectData[projectName];
+                    projectSection.innerHTML = `
+                        <h2 class="project-title">${projectName}</h2>
+                        <ul class="video-list">
+                            ${videos.map(video => `
+                                <li class="video-item">
+                                    <a class="video-link" href="${video.link}" target="_blank">
+                                        ${getVideoTitle(video.link)}
+                                    </a>
+                                    <span class="video-date">Posted: ${formatDate(video.date)}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    `;
+                    contentDiv.appendChild(projectSection);
+                });
+
+                loadingDiv.style.display = 'none';
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                errorDiv.textContent = `Error loading data: ${error.message}`;
+                errorDiv.style.display = 'block';
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        // Get post date from X.com
+        async function getPostDate(url) {
+            try {
+                const response = await axios.get(url, { timeout: 10000 });
+                
+                // Find timestamp element (this selector may need to be updated based on X.com's structure)
+                const timestampMatch = response.data.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/);
+                
+                if (timestampMatch && timestampMatch[1]) {
+                    return timestampMatch[1];
+                }
+
+                console.warn('Could not find timestamp in page content.');
+                return null;
+            } catch (error) {
+                console.error('Error fetching post date:', error);
+                return null;
+            }
+        }
+
+        // Generate video title from URL
+        function getVideoTitle(url) {
+            const pathSegments = url.split('/');
+            const lastSegment = pathSegments[pathSegments.length - 1];
+            return lastSegment.replace(/-/g, ' ').replace(/%20/g, ' ');
+        }
+
+        // Format date for display
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        // Search functionality
+        searchButton.addEventListener('click', () => {
+            const searchTerm = searchInput.value.toLowerCase();
+            if (!searchTerm) {
+                fetchData();
+                return;
+            }
+
+            // Filter content based on search term
+            const sections = contentDiv.querySelectorAll('.project-section');
+            sections.forEach(section => {
+                const title = section.querySelector('.project-title').textContent.toLowerCase();
+                const videos = section.querySelectorAll('.video-item');
+                
+                // Check if project name matches search term
+                if (title.includes(searchTerm)) {
+                    section.style.display = 'block';
+                    return;
+                }
+
+                // Check if any video link or title matches search term
+                let hasMatchingVideo = false;
+                videos.forEach(video => {
+                    const linkText = video.querySelector('.video-link').textContent.toLowerCase();
+                    const dateText = video.querySelector('.video-date').textContent.toLowerCase();
+                    
+                    if (linkText.includes(searchTerm) || dateText.includes(searchTerm)) {
+                        video.style.display = 'block';
+                        hasMatchingVideo = true;
+                    } else {
+                        video.style.display = 'none';
+                    }
+                });
+
+                section.style.display = hasMatchingVideo ? 'block' : 'none';
+            });
+        });
+
+        // Initialize
+        fetchData();
+    </script>
+</body>
+</html>
